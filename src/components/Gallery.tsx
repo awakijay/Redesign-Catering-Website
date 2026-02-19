@@ -1,42 +1,8 @@
 import { motion } from 'motion/react';
 import { useInView } from 'react-intersection-observer';
-import { useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-
-const galleryImages = [
-  {
-    src: 'https://images.unsplash.com/photo-1758797849151-1725021be42a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvZmZzaG9yZSUyMG9pbCUyMHJpZyUyMHBsYXRmb3JtJTIwb2NlYW58ZW58MXx8fHwxNzcwMjgyMTYyfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'Offshore platform',
-    category: 'Offshore',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1664993101841-036f189719b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxOaWdlcmlhbiUyMGpvbGxvZiUyMHJpY2UlMjBmb29kfGVufDF8fHx8MTc3MDM2NTUxM3ww&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'Nigerian cuisine',
-    category: 'Cuisine',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1702827482556-481adcd68f3b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxBZnJpY2FuJTIwY3Vpc2luZSUyMGRpc2hlcyUyMGNvbG9yZnVsfGVufDF8fHx8MTc3MDM2NTUxNHww&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'African dishes',
-    category: 'Cuisine',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1767785990437-dfe1fe516fe8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmR1c3RyaWFsJTIwY2F0ZXJpbmclMjBraXRjaGVuJTIwY2hlZnxlbnwxfHx8fDE3NzAzNjU1MTV8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'Professional kitchen',
-    category: 'Facilities',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1769638913840-2ca96d90e8a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjBldmVudCUyMGJ1ZmZldCUyMGNhdGVyaW5nfGVufDF8fHx8MTc3MDM2NTUxNnww&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'Event catering',
-    category: 'Events',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1767021922347-8a44324060c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvZmZzaG9yZSUyMHdvcmtlcnMlMjBkaW5pbmclMjBmYWNpbGl0eXxlbnwxfHx8fDE3NzAzNjU1MTZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    alt: 'Offshore dining',
-    category: 'Offshore',
-  },
-];
-
-const categories = ['All', 'Offshore', 'Cuisine', 'Facilities', 'Events'];
+import { AdminGalleryImage, defaultGalleryImages, readLocalStorageArray } from '../data/adminContent';
 
 export function Gallery() {
   const [ref, inView] = useInView({
@@ -45,6 +11,16 @@ export function Gallery() {
   });
 
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [galleryImages, setGalleryImages] = useState<AdminGalleryImage[]>(defaultGalleryImages);
+
+  useEffect(() => {
+    setGalleryImages(readLocalStorageArray('adminGalleryImages', defaultGalleryImages));
+  }, []);
+
+  const categories = useMemo(() => {
+    const categorySet = new Set(galleryImages.map((img) => img.category));
+    return ['All', ...Array.from(categorySet)];
+  }, [galleryImages]);
 
   const filteredImages =
     selectedCategory === 'All'
@@ -61,23 +37,18 @@ export function Gallery() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="text-green-600 font-semibold text-sm uppercase tracking-wider">
-            Gallery
-          </span>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-3 mb-4">
-            Our Work in Action
-          </h2>
+          <span className="text-green-600 font-semibold text-sm uppercase tracking-wider">Gallery</span>
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-3 mb-4">Latest Event & Product Photos</h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Explore our offshore operations, diverse cuisines, and professional facilities serving clients across Nigeria.
+            Our gallery is managed directly by the admin team, so customers always see up-to-date service highlights.
           </p>
         </motion.div>
 
-        {/* Filter Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.2 }}
-          className="flex justify-center gap-4 mb-12"
+          className="flex justify-center gap-4 mb-12 flex-wrap"
         >
           {categories.map((category) => (
             <motion.button
@@ -96,11 +67,10 @@ export function Gallery() {
           ))}
         </motion.div>
 
-        {/* Gallery Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredImages.map((image, index) => (
             <motion.div
-              key={image.src}
+              key={image.id}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={inView ? { opacity: 1, scale: 1 } : {}}
               transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -116,9 +86,7 @@ export function Gallery() {
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                 <div className="p-6 text-white">
-                  <span className="text-sm bg-green-600 px-3 py-1 rounded-full">
-                    {image.category}
-                  </span>
+                  <span className="text-sm bg-green-600 px-3 py-1 rounded-full">{image.category}</span>
                   <p className="mt-2 font-semibold">{image.alt}</p>
                 </div>
               </div>
