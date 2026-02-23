@@ -157,9 +157,9 @@ export function Profile() {
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.label} className="flex items-center gap-4 rounded-xl bg-gray-50 p-5">
-                  <div className="rounded-full bg-gradient-to-br from-green-600 to-blue-500 p-3">
-                    <Icon className="h-6 w-6 text-white" />
+                <div key={item.label} className="flex items-center gap-4 rounded-xl bg-gray-50 p-6">
+                  <div className="rounded-full bg-gradient-to-br from-green-600 to-blue-500 p-2">
+                    <Icon className="h-5 w-5 text-white" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">{item.label}</p>
@@ -172,103 +172,101 @@ export function Profile() {
         </motion.div>
 
         {/* Updates & Chat Section */}
-<div className="my-12 grid grid-cols-1 gap-6 lg:grid-cols-3 mt-16 mb-16">
-  
-  {/* Latest Updates */}
-  <section className="lg:col-span-2 rounded-2xl bg-white p-6 sm:p-8 shadow-xl flex flex-col">
-    <h2 className="text-2xl font-bold text-gray-900 mb-3">
-      Latest Updates
-    </h2>
-    <p className="mb-6 text-gray-600">
-      Announcements and new product updates from admin.
-    </p>
+        <div className="my-12 grid grid-cols-1 gap-6 lg:grid-cols-3 mt-16 mb-16">
 
-    {/* Scrollable Announcement List */}
-    <div className="h-[400px] overflow-y-auto space-y-4 pr-3 border-t pt-4 scroll-smooth">
-      {sortedAnnouncements.map((announcement) => (
-        <div
-          key={announcement.id}
-          className="rounded-xl border border-gray-200 p-6"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="font-semibold text-gray-900">
-              {announcement.title}
-            </h3>
-
-            {announcement.priority === "high" && (
-              <span className="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                High Priority
-              </span>
-            )}
-          </div>
-
-          <p className="mt-2 text-sm text-gray-600">
-            {announcement.content}
-          </p>
-
-          <p className="mt-3 text-xs text-gray-400">
-            {new Date(announcement.publishedAt).toLocaleString()}
-          </p>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  {/* Chat Section */}
-  <section className="rounded-2xl bg-white p-6 sm:p-8 shadow-xl flex flex-col">
-    <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900">
-      <MessageSquare className="h-5 w-5" />
-      Chat with Admin
-    </h2>
-
-    {/* Scrollable Chat Messages */}
-    <div className="flex-1 h-[300px] overflow-y-auto space-y-3 rounded-lg bg-gray-50 p-4 scroll-smooth">
-      {chatMessages.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          No conversation yet. Ask about products, bookings, or custom packages.
-        </p>
-      ) : (
-        chatMessages.map((chat) => (
-          <div
-            key={chat.id}
-            className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${
-              chat.sender === "user"
-                ? "ml-auto bg-blue-600 text-white"
-                : "border border-gray-200 bg-white text-gray-700"
-            }`}
-          >
-            <p>{chat.message}</p>
-            <p
-              className={`mt-1 text-[10px] ${
-                chat.sender === "user"
-                  ? "text-blue-100"
-                  : "text-gray-400"
-              }`}
-            >
-              {new Date(chat.createdAt).toLocaleTimeString()}
+          {/* Latest Updates */}
+          <section className="lg:col-span-2 rounded-2xl bg-white p-6 sm:p-8 shadow-xl flex flex-col">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              Latest Updates
+            </h2>
+            <p className="mb-6 text-gray-600">
+              Announcements and new product updates from admin.
             </p>
-          </div>
-        ))
-      )}
-    </div>
 
-    {/* Chat Input */}
-    <textarea
-      value={newMessage}
-      onChange={(e) => setNewMessage(e.target.value)}
-      rows={3}
-      className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-      placeholder="Type your message to admin"
-    />
-    <button
-      onClick={handleSendMessage}
-      className="mt-3 w-full rounded-lg bg-blue-600 py-2.5 font-semibold text-white transition-colors hover:bg-blue-700"
-    >
-      Send message
-    </button>
-  </section>
+            {/* Scrollable Announcement List */}
+            <div className="h-[400px] overflow-y-auto space-y-4 pr-3 border-t pt-4 scroll-smooth">
+              {sortedAnnouncements.map((announcement) => (
+                <div
+                  key={announcement.id}
+                  className="rounded-xl border border-gray-200 p-6"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <h3 className="font-semibold text-gray-900">
+                      {announcement.title}
+                    </h3>
 
-</div>
+                    {announcement.priority === "high" && (
+                      <span className="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                        High Priority
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-sm text-gray-600">
+                    {announcement.content}
+                  </p>
+
+                  <p className="mt-3 text-xs text-gray-400">
+                    {new Date(announcement.publishedAt).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Chat Section */}
+          <section className="rounded-2xl bg-white p-6 sm:p-8 shadow-xl flex flex-col">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900">
+              <MessageSquare className="h-5 w-5" />
+              Chat with Admin
+            </h2>
+
+            {/* Scrollable Chat Messages */}
+            <div className="flex-1 h-[300px] overflow-y-auto space-y-3 rounded-lg bg-gray-50 p-4 scroll-smooth">
+              {chatMessages.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No conversation yet. Ask about products, bookings, or custom packages.
+                </p>
+              ) : (
+                chatMessages.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${chat.sender === "user"
+                        ? "ml-auto bg-blue-600 text-white"
+                        : "border border-gray-200 bg-white text-gray-700"
+                      }`}
+                  >
+                    <p>{chat.message}</p>
+                    <p
+                      className={`mt-1 text-[10px] ${chat.sender === "user"
+                          ? "text-blue-100"
+                          : "text-gray-400"
+                        }`}
+                    >
+                      {new Date(chat.createdAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              rows={3}
+              className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Type your message to admin"
+            />
+            <button
+              onClick={handleSendMessage}
+              className="mt-3 w-full rounded-lg bg-blue-600 py-2.5 font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              Send message
+            </button>
+          </section>
+
+        </div>
 
         {/* Quote Requests */}
         <motion.section

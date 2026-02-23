@@ -14,10 +14,10 @@ export function Menu() {
     triggerOnce: true,
     threshold: 0.1,
   });
-   const [products, setProducts] = useState<AdminProduct[]>(defaultProducts);
+  const [products, setProducts] = useState<AdminProduct[]>(defaultProducts);
   const [announcements, setAnnouncements] = useState<SiteAnnouncement[]>(defaultAnnouncements);
 
-   useEffect(() => {
+  useEffect(() => {
     setProducts(readLocalStorageArray('adminProducts', defaultProducts));
     setAnnouncements(readLocalStorageArray('siteAnnouncements', defaultAnnouncements));
   }, []);
@@ -40,7 +40,7 @@ export function Menu() {
   return (
     <section id="menu" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-         {newestAnnouncement && (
+        {newestAnnouncement && (
           <div className=" mb-8 rounded-2xl bg-blue-50 border border-blue-100 p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 mb-2">
               New updates
@@ -57,7 +57,7 @@ export function Menu() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-         <span className="text-green-600 font-semibold text-sm uppercase tracking-wider">Our Menu</span>
+          <span className="text-green-600 font-semibold text-sm uppercase tracking-wider">Our Menu</span>
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-3 mb-4">Fresh Products & Event Packages</h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Explore our selection of authentic Nigerian, African, and intercontinental dishes
@@ -74,17 +74,21 @@ export function Menu() {
               transition={{ duration: 0.6, delay: index * 0.1 }}
               className="bg-gray-50 rounded-2xl p-8"
             >
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-green-600">{category}</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-green-600">{category}</h3>
               <ul className="space-y-5">
                 {groupedProducts[category].map((item) => (
                   <li key={item.id}>
                     <div className="flex items-center justify-between gap-3 mb-1">
                       <h4 className="font-semibold text-gray-900">{item.name}</h4>
-                      <span className="text-sm font-semibold text-green-700">{item.price}</span>
+                      <span className="text-sm font-semibold text-green-700"> {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                        minimumFractionDigits: 0,
+                      }).format(Number(item.price))}</span>
                     </div>
                     <p className="text-sm text-gray-600">{item.description}</p>
-                      {item.isNew && (
-                      <span className="inline-flex mt-2 bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                    {item.isNew && (
+                      <span className="inline-flex mt-2 bg-emerald-600 text-green-600 text-xs font-semibold px-2.5 py-1 rounded-full">
                         New
                       </span>
                     )}
@@ -94,7 +98,7 @@ export function Menu() {
             </motion.div>
           ))}
         </div>
-        </div>
+      </div>
     </section>
   );
 }
