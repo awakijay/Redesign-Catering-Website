@@ -212,7 +212,7 @@ export function AdminDashboard() {
 
   const navItems: { key: AdminTab; label: string; icon: typeof LayoutDashboard }[] = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'quotes', label: 'Quote Requests', icon: Calendar },
+    { key: 'quotes', label: 'Quotes (Approve)', icon: Calendar },
     { key: 'products', label: 'Products', icon: Package },
     { key: 'gallery', label: 'Gallery', icon: Image },
     { key: 'announcements', label: 'Updates', icon: Bell },
@@ -275,6 +275,38 @@ export function AdminDashboard() {
                   </div>
                 ))}
               </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">Recent Quotes (Quick Actions)</h3>
+                  <button onClick={() => setActiveTab('quotes')} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">
+                    Open Quotes Tab
+                  </button>
+                </div>
+                {quotes.length === 0 ? (
+                  <p className="text-sm text-slate-500">No quote requests yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {quotes.slice(0, 3).map((quote) => (
+                      <div key={quote.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{quote.name}</p>
+                          <p className="text-xs text-slate-500">{quote.email} • {new Date(quote.date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setSelectedQuote(quote)} className="rounded-md bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"><Eye className="h-4 w-4" /></button>
+                          {quote.status === 'pending' && (
+                            <>
+                              <button onClick={() => updateQuoteStatus(quote.id, 'approved')} className="rounded-md bg-green-100 p-2 text-green-700 hover:bg-green-200"><CheckCircle2 className="h-4 w-4" /></button>
+                              <button onClick={() => updateQuoteStatus(quote.id, 'rejected')} className="rounded-md bg-red-100 p-2 text-red-700 hover:bg-red-200"><XCircle className="h-4 w-4" /></button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
           )}
 
@@ -300,7 +332,11 @@ export function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {quotes.map((quote) => (
+                    {quotes.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No quote requests available yet.</td>
+                      </tr>
+                    ) : quotes.map((quote) => (
                       <tr key={quote.id} className="border-t border-slate-100">
                         <td className="px-4 py-3"><p className="font-medium text-slate-900">{quote.name}</p><p className="text-xs text-slate-500">{quote.email}</p></td>
                         <td className="px-4 py-3 text-slate-700">{quote.eventType}</td>
