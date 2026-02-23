@@ -1,24 +1,34 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import {
+  Bell,
+  Image,
+  LayoutDashboard,
   LogOut,
-  Search,
-  Filter,
   Calendar,
-  User,
-  Mail,
-  Phone,
-  Clock,
+  MessageSquare,
+  Package,
+  Plus,
+  Send,
+  Trash2,
+  Users,
+  Eye,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  Eye,
-  TrendingUp,
-  Users,
-  FileText,
   X,
 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import {
+  AdminGalleryImage,
+  AdminProduct,
+  ChatMessage,
+  SiteAnnouncement,
+  UserRecord,
+  defaultAnnouncements,
+  defaultGalleryImages,
+  defaultProducts,
+  readLocalStorageArray,
+} from '../data/adminContent';
 
 interface QuoteRequest {
   id: string;
@@ -32,66 +42,82 @@ interface QuoteRequest {
   submittedAt: string;
   status: string;
 }
+type AdminTab = 'overview' | 'quotes' | 'products' | 'gallery' | 'announcements' | 'chat';
+
+const inputClass =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
 export function AdminDashboard() {
-  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
-  const [filteredQuotes, setFilteredQuotes] = useState<QuoteRequest[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null);
+  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>(defaultProducts);
+  const [galleryItems, setGalleryItems] = useState<AdminGalleryImage[]>(defaultGalleryImages);
+  const [announcements, setAnnouncements] = useState<SiteAnnouncement[]>(defaultAnnouncements);
+  const [users, setUsers] = useState<UserRecord[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [selectedEmail, setSelectedEmail] = useState('');
+  const [newChatMessage, setNewChatMessage] = useState('');
+
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    description: '',
+    category: 'Nigerian Cuisine',
+    price: '',
+    image: '',
+    isNew: true,
+  });
+
+  const [newGallery, setNewGallery] = useState({
+    src: '',
+    alt: '',
+    category: 'Events',
+  });
+
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    content: '',
+    priority: 'normal' as 'normal' | 'high',
+  });
+
 
   useEffect(() => {
-    loadQuotes();
+    setQuotes(readLocalStorageArray('quoteRequests', []));
+    setProducts(readLocalStorageArray('adminProducts', defaultProducts));
+    setGalleryItems(readLocalStorageArray('adminGalleryImages', defaultGalleryImages));
+    setAnnouncements(readLocalStorageArray('siteAnnouncements', defaultAnnouncements));
+
+    const accountUsers = readLocalStorageArray<UserRecord & { password?: string }>('users', []).map(
+      ({ password: _password, ...user }) => user
+    );
+    setUsers(accountUsers);
+
+    const savedMessages = readLocalStorageArray('chatMessages', []);
+    setChatMessages(savedMessages);
+
+    if (accountUsers.length > 0) {
+      setSelectedEmail(accountUsers[0].email);
+    }
   }, []);
 
-  useEffect(() => {
-    filterQuotes();
-  }, [quotes, searchTerm, statusFilter]);
-
-  const loadQuotes = () => {
-    const allQuotes = JSON.parse(localStorage.getItem('quoteRequests') || '[]');
-    setQuotes(allQuotes);
+  const persist = <T,>(key: string, value: T[]) => {
+    localStorage.setItem(key, JSON.stringify(value));
   };
 
-  const filterQuotes = () => {
-    let filtered = [...quotes];
 
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((q) => q.status === statusFilter);
-    }
+  const selectedUser = users.find((user) => user.email === selectedEmail);
+  const conversation = useMemo(
+    () => chatMessages.filter((message) => message.userEmail === selectedEmail),
+    [chatMessages, selectedEmail]
+  );
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (q) =>
-          q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          q.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          q.phone.includes(searchTerm) ||
-          q.eventType.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
 
-    // Sort by date (newest first)
-    filtered.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-
-    setFilteredQuotes(filtered);
-  };
-
-  const updateQuoteStatus = (quoteId: string, newStatus: string) => {
-    const allQuotes = JSON.parse(localStorage.getItem('quoteRequests') || '[]');
-    const updatedQuotes = allQuotes.map((q: QuoteRequest) =>
-      q.id === quoteId ? { ...q, status: newStatus } : q
-    );
-
-    localStorage.setItem('quoteRequests', JSON.stringify(updatedQuotes));
-    setQuotes(updatedQuotes);
-
-    if (selectedQuote?.id === quoteId) {
-      setSelectedQuote({ ...selectedQuote, status: newStatus });
-    }
-
-    toast.success(`Quote ${newStatus}!`);
+  const unreadUserMessages = chatMessages.filter((message) => message.sender === 'user').length;
+  const quoteStats = {
+    total: quotes.length,
+    pending: quotes.filter((quote) => quote.status === 'pending').length,
+    approved: quotes.filter((quote) => quote.status === 'approved').length,
+    rejected: quotes.filter((quote) => quote.status === 'rejected').length,
   };
 
   const handleLogout = () => {
@@ -99,471 +125,613 @@ export function AdminDashboard() {
     window.location.hash = '';
     toast.success('Logged out successfully');
   };
+  const updateQuoteStatus = (quoteId: string, newStatus: 'approved' | 'rejected') => {
+    const updated = quotes.map((quote) =>
+      quote.id === quoteId ? { ...quote, status: newStatus } : quote
+    );
+    persist('quoteRequests', updated);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'approved':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+    if (selectedQuote?.id === quoteId) {
+      setSelectedQuote({ ...selectedQuote, status: newStatus });
     }
+    toast.success(`Quote ${newStatus}`);
   };
 
-  const getEventTypeLabel = (type: string) => {
-    switch (type) {
-      case 'offshore':
-        return 'Offshore Catering';
-      case 'facility':
-        return 'Facility Management';
-      case 'event':
-        return 'Event Catering';
-      default:
-        return type;
+  const addProduct = () => {
+    if (!newProduct.name || !newProduct.description || !newProduct.price) {
+      toast.error('Please complete required product fields');
+      return;
     }
+    const payload: AdminProduct = {
+      id: Date.now().toString(),
+      ...newProduct,
+    };
+
+    const updated = [payload, ...products];
+    setProducts(updated);
+    persist('adminProducts', updated);
+    setNewProduct({
+      name: '',
+      description: '',
+      category: 'Nigerian Cuisine',
+      price: '',
+      image: '',
+      isNew: true,
+    });
+    toast.success('Product published to website');
   };
 
-  const stats = {
-    total: quotes.length,
-    pending: quotes.filter((q) => q.status === 'pending').length,
-    approved: quotes.filter((q) => q.status === 'approved').length,
-    rejected: quotes.filter((q) => q.status === 'rejected').length,
+  const addGalleryItem = () => {
+    if (!newGallery.src || !newGallery.alt) {
+      toast.error('Image URL and caption are required');
+      return;
+    }
+
+    const payload: AdminGalleryImage = {
+      id: Date.now().toString(),
+      ...newGallery,
+    };
+
+    const updated = [payload, ...galleryItems];
+    setGalleryItems(updated);
+    persist('adminGalleryImages', updated);
+    setNewGallery({ src: '', alt: '', category: 'Events' });
+    toast.success('Gallery image added');
   };
+
+
+  const publishAnnouncement = () => {
+    if (!newAnnouncement.title || !newAnnouncement.content) {
+      toast.error('Announcement title and content are required');
+      return;
+    }
+
+    const payload: SiteAnnouncement = {
+      id: Date.now().toString(),
+      title: newAnnouncement.title,
+      content: newAnnouncement.content,
+      priority: newAnnouncement.priority,
+      publishedAt: new Date().toISOString(),
+    };
+
+    const updated = [payload, ...announcements];
+    setAnnouncements(updated);
+    persist('siteAnnouncements', updated);
+    setNewAnnouncement({ title: '', content: '', priority: 'normal' });
+    toast.success('Announcement posted');
+  };
+  const sendAdminMessage = () => {
+    if (!selectedUser || !newChatMessage.trim()) {
+      return;
+    }
+
+    const payload: ChatMessage = {
+      id: Date.now().toString(),
+      userEmail: selectedUser.email,
+      userName: selectedUser.name,
+      sender: 'admin',
+      message: newChatMessage.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [...chatMessages, payload];
+    setChatMessages(updated);
+    persist('chatMessages', updated);
+    setNewChatMessage('');
+  }
+
+  const navItems: { key: AdminTab; label: string; icon: typeof LayoutDashboard }[] = [
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'quotes', label: 'Quotes', icon: Calendar },
+    { key: 'products', label: 'Products', icon: Package },
+    { key: 'gallery', label: 'Gallery', icon: Image },
+    { key: 'announcements', label: 'Updates', icon: Bell },
+    { key: 'chat', label: 'User Chat', icon: MessageSquare },
+  ];
+
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-sm text-gray-600">Manage quote requests and bookings</p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </motion.button>
+    <div className="min-h-screen bg-slate-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-gradient-to-r from-green-600 to-blue-500 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Catering Admin Panel</h1>
+            <p className="text-sm text-white">
+              Manage products, gallery content, announcements and customer chat.
+            </p>
           </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg"
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium">Total Requests</p>
-                <p className="text-3xl font-bold mt-2">{stats.total}</p>
-              </div>
-              <FileText className="w-12 h-12 text-blue-200" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-yellow-100 text-sm font-medium">Pending</p>
-                <p className="text-3xl font-bold mt-2">{stats.pending}</p>
-              </div>
-              <Clock className="w-12 h-12 text-yellow-200" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium">Approved</p>
-                <p className="text-3xl font-bold mt-2">{stats.approved}</p>
-              </div>
-              <CheckCircle2 className="w-12 h-12 text-green-200" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100 text-sm font-medium">Rejected</p>
-                <p className="text-3xl font-bold mt-2">{stats.rejected}</p>
-              </div>
-              <XCircle className="w-12 h-12 text-red-200" />
-            </div>
-          </motion.div>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
         </div>
 
-        {/* Filters and Search */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-xl shadow-md p-6 mb-6"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name, email, phone, or event type..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-              />
-            </div>
 
-            {/* Status Filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none appearance-none bg-white"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
+      </header>
+
+      <div className=" mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[250px_1fr] lg:px-8 justify-between ">
+        <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
+        </aside>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <span>
-              Showing {filteredQuotes.length} of {quotes.length} requests
-            </span>
-            {(searchTerm || statusFilter !== 'all') && (
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('all');
-                }}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
-        </motion.div>
+        <main className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mt-20">
+          {activeTab === 'overview' && (
+            <section className="space-y-6">
+              <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-green-600 to-blue-500 text-white">
+                <div className="grid grid-cols-1 lg:grid-cols-2">
+                  <div className="p-6 lg:p-8">
+                    <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Admin summary</p>
+                    <h2 className="mt-3 text-3xl font-bold">Beautiful and Standard Admin Experience</h2>
+                    <p className="mt-3 text-sm text-slate-200">Quickly manage quote approvals, upload product/gallery content, and respond to registered users from one screen.</p>
+                  </div>
+                  <img src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80" alt="Catering admin dashboard" className="h-full w-full object-cover rounded-l-b-[20px]" />
+                </div>
 
-        {/* Quotes List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white rounded-xl shadow-md overflow-hidden"
-        >
-          {filteredQuotes.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No requests found</h3>
-              <p className="text-gray-600">
-                {searchTerm || statusFilter !== 'all'
-                  ? 'Try adjusting your filters'
-                  : 'Quote requests will appear here'}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Client
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Event Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Guests
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredQuotes.map((quote, index) => (
-                    <motion.tr
-                      key={quote.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-semibold text-gray-900">{quote.name}</p>
-                          <p className="text-sm text-gray-600">{quote.email}</p>
-                          <p className="text-sm text-gray-600">{quote.phone}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-900">{getEventTypeLabel(quote.eventType)}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          <span>{new Date(quote.date).toLocaleDateString()}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Users className="w-4 h-4" />
-                          <span>{quote.guests}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(
-                            quote.status
-                          )}`}
-                        >
-                          {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setSelectedQuote(quote)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </motion.button>
-
-                          {quote.status === 'pending' && (
-                            <>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => updateQuoteStatus(quote.id, 'approved')}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Approve"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </motion.button>
-
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => updateQuoteStatus(quote.id, 'rejected')}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </motion.button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 px-6 mt-6">
+                  {[
+                    ['Quote Requests', quoteStats.total.toString(), 'from-violet-500 to-indigo-500'],
+                    ['Pending Quotes', quoteStats.pending.toString(), 'from-amber-500 to-orange-500'],
+                    ['Registered Users', users.length.toString(), 'from-emerald-500 to-green-500'],
+                    ['Unread User Messages', unreadUserMessages.toString(), 'from-sky-500 to-cyan-500'],
+                  ].map(([label, value, gradient]) => (
+                    <div key={label} className={`rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700`}>
+                      <p className="text-sm text-white/90">{label}</p>
+                      <p className="mt-2 text-3xl font-bold">{value}</p>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 mt-6">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">Recent Quotes (Quick Actions)</h3>
+                    <button onClick={() => setActiveTab('quotes')} className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">
+                      Open Quotes Tab
+                    </button>
+                  </div>
+                  {quotes.length === 0 ? (
+                    <p className="text-sm text-slate-500">No quote requests yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {quotes.slice(0, 3).map((quote) => (
+                        <div key={quote.id} className="flex bg-gradient-to-r from-green-600 to-blue-500 flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">{quote.name}</p>
+                            <p className="text-xs text-slate-500">{quote.email} • {new Date(quote.date).toLocaleDateString()}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setSelectedQuote(quote)} className="rounded-md bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"><Eye className="h-4 w-4" /></button>
+                            {quote.status === 'pending' && (
+                              <>
+                                <button onClick={() => updateQuoteStatus(quote.id, 'approved')} className="rounded-md bg-green-100 p-2 text-green-700 hover:bg-green-200"><CheckCircle2 className="h-4 w-4" /></button>
+                                <button onClick={() => updateQuoteStatus(quote.id, 'rejected')} className="rounded-md bg-red-100 p-2 text-red-700 hover:bg-red-200"><XCircle className="h-4 w-4" /></button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                  )}
+                </div>
+                </div>
+            </section>
           )}
-        </motion.div>
-      </div>
+          {activeTab === 'quotes' && (
+            <section className="space-y-6">
+              <h2 className="text-xl font-bold text-slate-900">Quote Requests</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="rounded-xl bg-yellow-50 p-4 border border-yellow-200"><p className="text-sm text-yellow-700">Pending</p><p className="text-2xl font-bold text-yellow-800">{quoteStats.pending}</p></div>
+                <div className="rounded-xl bg-green-50 p-4 border border-green-200"><p className="text-sm text-green-700">Approved</p><p className="text-2xl font-bold text-green-800">{quoteStats.approved}</p></div>
+                <div className="rounded-xl bg-red-50 p-4 border border-red-200"><p className="text-sm text-red-700">Rejected</p><p className="text-2xl font-bold text-red-800">{quoteStats.rejected}</p></div>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">Client</th>
+                      <th className="px-4 py-3">Event</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotes.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No quote requests available yet.</td>
+                      </tr>
+                    ) : quotes.map((quote) => (
+                      <tr key={quote.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3"><p className="font-medium text-slate-900">{quote.name}</p><p className="text-xs text-slate-500">{quote.email}</p></td>
+                        <td className="px-4 py-3 text-slate-700">{quote.eventType}</td>
+                        <td className="px-4 py-3 text-slate-700">{new Date(quote.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${quote.status === 'approved' ? 'bg-green-100 text-green-700' : quote.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{quote.status}</span></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setSelectedQuote(quote)} className="rounded-md bg-slate-100 p-2 text-slate-700 hover:bg-slate-200"><Eye className="h-4 w-4" /></button>
+                            {quote.status === 'pending' && (
+                              <>
+                                <button onClick={() => updateQuoteStatus(quote.id, 'approved')} className="rounded-md bg-green-100 p-2 text-green-700 hover:bg-green-200"><CheckCircle2 className="h-4 w-4" /></button>
+                                <button onClick={() => updateQuoteStatus(quote.id, 'rejected')} className="rounded-md bg-red-100 p-2 text-red-700 hover:bg-red-200"><XCircle className="h-4 w-4" /></button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+          {activeTab === 'products' && (
+            <section className="space-y-6">
+              <h2 className="text-xl font-bold text-slate-900">Website Products</h2>
 
-      {/* Quote Details Modal */}
-      <AnimatePresence>
-        {selectedQuote && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedQuote(null)}
-              className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm"
-            />
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <input
+                    value={newProduct.name}
+                    onChange={(event) =>
+                      setNewProduct((old) => ({ ...old, name: event.target.value }))
+                    }
+                    placeholder="Product name"
+                    className={inputClass}
+                  />
+                  <input
+                    value={newProduct.price}
+                    onChange={(event) =>
+                      setNewProduct((old) => ({ ...old, price: event.target.value }))
+                    }
+                    placeholder="Price"
+                    className={inputClass}
+                  />
+                  <input
+                    value={newProduct.category}
+                    onChange={(event) =>
+                      setNewProduct((old) => ({ ...old, category: event.target.value }))
+                    }
+                    placeholder="Category"
+                    className={inputClass}
+                  />
+                  <input
+                    value={newProduct.image}
+                    onChange={(event) =>
+                      setNewProduct((old) => ({ ...old, image: event.target.value }))
+                    }
+                    placeholder="Image URL (optional)"
+                    className={inputClass}
+                  />
+                  <textarea
+                    value={newProduct.description}
+                    onChange={(event) =>
+                      setNewProduct((old) => ({ ...old, description: event.target.value }))
+                    }
+                    placeholder="Description"
+                    rows={3}
+                    className={`${inputClass} md:col-span-2`}
+                  />
+                </div>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            >
-              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                  <h2 className="text-2xl font-bold text-gray-900">Quote Request Details</h2>
+                <div className="mt-3 flex flex-wrap items-center gap-4">
+                  <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={newProduct.isNew}
+                      onChange={(event) =>
+                        setNewProduct((old) => ({ ...old, isNew: event.target.checked }))
+                      }
+                    />
+                    Mark as new
+                  </label>
                   <button
-                    onClick={() => setSelectedQuote(null)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    onClick={addProduct}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                   >
-                    <X className="w-5 h-5" />
+                    <Plus className="h-4 w-4" />
+                    Publish product
                   </button>
                 </div>
+              </div>
+              <div className="space-y-3">
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 p-4"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-900">{product.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {product.category} • {product.price}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">{product.description}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const updated = products.filter((item) => item.id !== product.id);
+                        setProducts(updated);
+                        persist('adminProducts', updated);
+                      }}
+                      className="rounded-md p-2 text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
-                {/* Modal Content */}
-                <div className="p-6 space-y-6">
-                  {/* Status */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Status
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(
-                          selectedQuote.status
-                        )}`}
+
+
+          {activeTab === 'gallery' && (
+            <section className="space-y-6">
+              <h2 className="text-xl font-bold text-slate-900">Gallery Manager</h2>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <input
+                    value={newGallery.src}
+                    onChange={(event) =>
+                      setNewGallery((old) => ({ ...old, src: event.target.value }))
+                    }
+                    placeholder="Image URL"
+                    className={inputClass}
+                  />
+                  <input
+                    value={newGallery.alt}
+                    onChange={(event) =>
+                      setNewGallery((old) => ({ ...old, alt: event.target.value }))
+                    }
+                    placeholder="Caption"
+                    className={inputClass}
+                  />
+                  <input
+                    value={newGallery.category}
+                    onChange={(event) =>
+                      setNewGallery((old) => ({ ...old, category: event.target.value }))
+                    }
+                    placeholder="Category"
+                    className={inputClass}
+                  />
+                </div>
+
+                <button
+                  onClick={addGalleryItem}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add gallery photo
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {galleryItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex justify-between gap-4 rounded-xl border border-slate-200 p-4"
+                  >
+
+                    <div>
+                      <p className="font-semibold text-slate-900">{item.alt}</p>
+                      <p className="text-sm text-slate-500">{item.category}</p>
+                      <p className="mt-1 break-all text-xs text-slate-400">{item.src}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const updated = galleryItems.filter((entry) => entry.id !== item.id);
+                        setGalleryItems(updated);
+                        persist('adminGalleryImages', updated);
+                      }}
+                      className="rounded-md p-2 text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'announcements' && (
+            <section className="space-y-6">
+              <h2 className="text-xl font-bold text-slate-900">Customer Updates</h2>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="space-y-3">
+                  <input
+                    value={newAnnouncement.title}
+                    onChange={(event) =>
+                      setNewAnnouncement((old) => ({ ...old, title: event.target.value }))
+                    }
+                    placeholder="Announcement title"
+                    className={inputClass}
+                  />
+                  <textarea
+                    value={newAnnouncement.content}
+                    onChange={(event) =>
+                      setNewAnnouncement((old) => ({ ...old, content: event.target.value }))
+                    }
+                    placeholder="Announcement message"
+                    rows={4}
+                    className={inputClass}
+                  />
+                  <select
+                    value={newAnnouncement.priority}
+                    onChange={(event) =>
+                      setNewAnnouncement((old) => ({
+                        ...old,
+                        priority: event.target.value as 'normal' | 'high',
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="normal">Normal priority</option>
+                    <option value="high">High priority</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={publishAnnouncement}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  <Send className="h-4 w-4" />
+                  Publish update
+                </button>
+              </div>
+              <div className="space-y-3">
+                {announcements.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 p-4"
+                  >
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">{item.title}</p>
+                        {item.priority === 'high' && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                            High
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">{item.content}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const updated = announcements.filter((entry) => entry.id !== item.id);
+                        setAnnouncements(updated);
+                        persist('siteAnnouncements', updated);
+                      }}
+                      className="rounded-md p-2 text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'chat' && (
+            <section className="space-y-5">
+              <h2 className="text-xl font-bold text-slate-900">Chat with Registered Users</h2>
+
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_1fr]">
+                <div className="h-[430px] overflow-y-auto rounded-xl border border-slate-200 p-3">
+                  {users.map((user) => {
+                    const isSelected = selectedEmail === user.email;
+
+                    return (
+                      <button
+                        key={user.email}
+                        onClick={() => setSelectedEmail(user.email)}
+                        className={`mb-2 w-full rounded-lg p-3 text-left transition ${isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                          }`}
                       >
-                        {selectedQuote.status.charAt(0).toUpperCase() + selectedQuote.status.slice(1)}
-                      </span>
+                        <p className="font-semibold">{user.name}</p>
+                        <p className="text-xs opacity-80">{user.email}</p>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      {selectedQuote.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => updateQuoteStatus(selectedQuote.id, 'approved')}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
-                          >
-                            Approve
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => updateQuoteStatus(selectedQuote.id, 'rejected')}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-semibold"
-                          >
-                            Reject
-                          </motion.button>
-                        </div>
-                      )}
-                    </div>
+                <div className="flex h-[430px] flex-col rounded-xl border border-slate-200 p-4">
+                  <div className="mb-4 flex items-center gap-2 text-sm text-slate-700">
+                    <Users className="h-4 w-4" />
+                    {selectedUser
+                      ? `${selectedUser.name} (${selectedUser.email})`
+                      : 'Select a user'}
                   </div>
 
-                  {/* Client Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Client Name
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <User className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{selectedQuote.name}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Email
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <Mail className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900 text-sm break-all">{selectedQuote.email}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Phone
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <Phone className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{selectedQuote.phone}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Event Type
-                      </label>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <span className="text-gray-900">{getEventTypeLabel(selectedQuote.eventType)}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Event Date
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <Calendar className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">
-                          {new Date(selectedQuote.date).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Number of Guests
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <span className="text-gray-900">{selectedQuote.guests}</span>
-                      </div>
-                    </div>
+                  <div className="flex-1 space-y-2 overflow-y-auto rounded-lg bg-slate-50 p-3">
+                    {conversation.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`max-w-[82%] rounded-lg px-3 py-2 text-sm ${item.sender === 'admin'
+                            ? 'ml-auto bg-blue-600 text-white'
+                            : 'border border-slate-200 bg-white text-slate-700'
+                          }`}
+                      >
+                        <p>{item.message}</p>
+                      </motion.div>
+                    ))}
                   </div>
 
-                  {/* Additional Details */}
-                  {selectedQuote.message && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Additional Details
-                      </label>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-gray-900 whitespace-pre-wrap">{selectedQuote.message}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Submission Time */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Submitted
-                    </label>
-                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <Clock className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-900">
-                        {new Date(selectedQuote.submittedAt).toLocaleString()}
-                      </span>
-                    </div>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={newChatMessage}
+                      onChange={(event) => setNewChatMessage(event.target.value)}
+                      className={inputClass}
+                      placeholder="Reply to customer"
+                    />
+                    <button
+                      onClick={sendAdminMessage}
+                      className="rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      Send
+                    </button>
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            </section>
+          )}
+        </main>
+      </div>
+      {selectedQuote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-2xl font-bold text-slate-900">Quote Details</h3>
+              <button onClick={() => setSelectedQuote(null)} className="rounded-md p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div><p className="text-xs text-slate-500">Client</p><p className="font-semibold">{selectedQuote.name}</p></div>
+              <div><p className="text-xs text-slate-500">Email</p><p className="font-semibold">{selectedQuote.email}</p></div>
+              <div><p className="text-xs text-slate-500">Phone</p><p className="font-semibold">{selectedQuote.phone}</p></div>
+              <div><p className="text-xs text-slate-500">Date</p><p className="font-semibold">{new Date(selectedQuote.date).toLocaleDateString()}</p></div>
+              <div><p className="text-xs text-slate-500">Guests</p><p className="font-semibold">{selectedQuote.guests}</p></div>
+              <div><p className="text-xs text-slate-500">Status</p><p className="font-semibold capitalize">{selectedQuote.status}</p></div>
+            </div>
+            <div className="mt-4 rounded-lg bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Message</p>
+              <p className="mt-1 text-sm text-slate-700">{selectedQuote.message || 'No message'}</p>
+            </div>
+            {selectedQuote.status === 'pending' && (
+              <div className="mt-5 flex gap-3">
+                <button onClick={() => updateQuoteStatus(selectedQuote.id, 'approved')} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">Accept Quote</button>
+                <button onClick={() => updateQuoteStatus(selectedQuote.id, 'rejected')} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Reject Quote</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
